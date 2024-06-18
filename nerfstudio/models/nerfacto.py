@@ -122,7 +122,7 @@ class NerfactoModelConfig(ModelConfig):
     """Whether to disable scene contraction or not."""
     use_gradient_scaling: bool = False
     """Use gradient scaler where the gradients are lower for points closer to the camera."""
-    implementation: Literal["tcnn", "torch"] = "tcnn"
+    implementation: Literal["tcnn", "torch"] = "torch"
     """Which implementation to use for the model."""
     appearance_embed_dim: int = 32
     """Dimension of the appearance embedding."""
