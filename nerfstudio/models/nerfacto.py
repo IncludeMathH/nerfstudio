@@ -122,7 +122,7 @@ class NerfactoModelConfig(ModelConfig):
     """Whether to disable scene contraction or not."""
     use_gradient_scaling: bool = False
     """Use gradient scaler where the gradients are lower for points closer to the camera."""
-    implementation: Literal["tcnn", "torch"] = "torch"
+    implementation: Literal["tcnn", "torch"] = "tcnn"
     """Which implementation to use for the model."""
     appearance_embed_dim: int = 32
     """Dimension of the appearance embedding."""
@@ -368,7 +368,6 @@ class NerfactoModel(Model):
             pred_accumulation=outputs["accumulation"],
             gt_image=image,
         )
-
         loss_dict["rgb_loss"] = self.rgb_loss(gt_rgb, pred_rgb)
         if self.training:
             loss_dict["interlevel_loss"] = self.config.interlevel_loss_mult * interlevel_loss(

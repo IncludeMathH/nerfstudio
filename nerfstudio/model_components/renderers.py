@@ -445,3 +445,110 @@ class NormalsRenderer(nn.Module):
         if normalize:
             n = safe_normalize(n)
         return n
+
+class EdgeRenderer(nn.Module):
+    """Standard volumetric rendering.
+
+    Args:
+        background_color: Background color as RGB. Uses random colors if None.
+    """
+
+    def __init__(self, method: Literal["median", "expected"] = "median") -> None:
+        super().__init__()
+        self.method = method
+
+    @classmethod
+    def combine_rgb(
+        cls,
+        rgb: Float[Tensor, "*bs num_samples 3"],
+        weights: Float[Tensor, "*bs num_samples 1"],
+        background_color: BackgroundColor = "random",
+        ray_indices: Optional[Int[Tensor, "num_samples"]] = None,
+        num_rays: Optional[int] = None,
+    ) -> Float[Tensor, "*bs 3"]:
+        """Composite samples along ray and render color image.
+        If background color is random, no BG color is added - as if the background was black!
+
+        Args:
+            rgb: RGB for each sample
+            weights: Weights for each sample
+            background_color: Background color as RGB.
+            ray_indices: Ray index for each sample, used when samples are packed.
+            num_rays: Number of rays, used when samples are packed.
+
+        Returns:
+            Outputs rgb values.
+        """
+        if ray_indices is not None and num_rays is not None:
+            # Necessary for packed samples from volumetric ray sampler
+            if background_color == "last_sample":
+                raise NotImplementedError("Background color 'last_sample' not implemented for packed samples.")
+            comp_rgb = nerfacc.accumulate_along_rays(
+                weights[..., 0], values=rgb, ray_indices=ray_indices, n_rays=num_rays
+            )
+            accumulated_weight = nerfacc.accumulate_along_rays(
+                weights[..., 0], values=None, ray_indices=ray_indices, n_rays=num_rays
+            )
+        else:
+            comp_rgb = torch.sum(weights * rgb, dim=-2)
+            accumulated_weight = torch.sum(weights, dim=-2)
+        if BACKGROUND_COLOR_OVERRIDE is not None:
+            background_color = BACKGROUND_COLOR_OVERRIDE
+        if background_color == "random":
+            # If background color is random, the predicted color is returned without blending,
+            # as if the background color was black.
+            return comp_rgb
+        elif background_color == "last_sample":
+            # Note, this is only supported for non-packed samples.
+            background_color = rgb[..., -1, :]
+        background_color = cls.get_background_color(background_color, shape=comp_rgb.shape, device=comp_rgb.device)
+
+        assert isinstance(background_color, torch.Tensor)
+        comp_rgb = comp_rgb + background_color * (1.0 - accumulated_weight)
+        return comp_rgb
+
+    def forward(
+        self,
+        edge: Float[Tensor, "*bs num_samples 1"],
+        weights: Float[Tensor, "*bs num_samples 1"],
+        ray_indices: Optional[Int[Tensor, "num_samples"]] = None,
+        num_rays: Optional[int] = None,
+    ) -> Float[Tensor, "*bs 3"]:
+        """Composite samples along ray and render color image
+
+        Args:
+            edge: edge probiblity for each sample
+            weights: Weights for each sample
+            ray_indices: Ray index for each sample, used when samples are packed.
+            num_rays: Number of rays, used when samples are packed.
+            background_color: The background color to use for rendering.
+
+        Returns:
+            Outputs of rgb values.
+        """
+        if ray_indices is not None and num_rays is not None:
+            raise NotImplementedError("Edge calculation is not implemented for packed samples.")
+        
+        if not self.training:
+            edge = torch.nan_to_num(edge)
+
+        if self.method == "median":
+            cumulative_weights = torch.cumsum(weights[..., 0], dim=-1)  # [..., num_samples]
+            split = torch.ones((*weights.shape[:-2], 1), device=weights.device) * 0.5  # [..., 1]
+            median_index = torch.searchsorted(cumulative_weights, split, side="left")  # [..., 1]
+            median_index = torch.clamp(median_index, 0, edge.shape[-2] - 1)  # [..., 1]
+            median_depth = torch.gather(edge[..., 0], dim=-1, index=median_index)  # [..., 1]
+            if not self.training:
+                torch.clamp_(median_depth, min=0.0, max=1.0)
+            return median_depth
+        elif self.method == "expected":
+            eps = 1e-10
+
+
+            depth = torch.sum(weights * edge, dim=-2) / (torch.sum(weights, -2) + eps)
+            if not self.training:
+                torch.clamp_(depth, min=0.0, max=1.0)
+            return depth
+
+        else:
+            raise NotImplementedError(f"Method {self.method} not implemented")

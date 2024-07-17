@@ -21,6 +21,7 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Dict, Union
 
+from nerfstudio.models.nerfacto_edge import NerfactoEdgeModelConfig
 import tyro
 
 from nerfstudio.cameras.camera_optimizers import CameraOptimizerConfig
@@ -29,6 +30,7 @@ from nerfstudio.configs.external_methods import ExternalMethodDummyTrainerConfig
 from nerfstudio.data.datamanagers.base_datamanager import VanillaDataManager, VanillaDataManagerConfig
 from nerfstudio.data.datamanagers.full_images_datamanager import FullImageDatamanagerConfig
 from nerfstudio.data.datamanagers.parallel_datamanager import ParallelDataManagerConfig
+from nerfstudio.data.datamanagers.parallel_edge_datamanager import ParallelEdgeDataManagerConfig
 from nerfstudio.data.datamanagers.random_cameras_datamanager import RandomCamerasDataManagerConfig
 from nerfstudio.data.dataparsers.blender_dataparser import BlenderDataParserConfig
 from nerfstudio.data.dataparsers.dnerf_dataparser import DNeRFDataParserConfig
@@ -99,6 +101,43 @@ method_configs["nerfacto"] = TrainerConfig(
             eval_num_rays_per_chunk=1 << 15,
             average_init_density=0.01,
             camera_optimizer=CameraOptimizerConfig(mode="SO3xR3"),
+        ),
+    ),
+    optimizers={
+        "proposal_networks": {
+            "optimizer": AdamOptimizerConfig(lr=1e-2, eps=1e-15),
+            "scheduler": ExponentialDecaySchedulerConfig(lr_final=0.0001, max_steps=200000),
+        },
+        "fields": {
+            "optimizer": AdamOptimizerConfig(lr=1e-2, eps=1e-15),
+            "scheduler": ExponentialDecaySchedulerConfig(lr_final=0.0001, max_steps=200000),
+        },
+        "camera_opt": {
+            "optimizer": AdamOptimizerConfig(lr=1e-3, eps=1e-15),
+            "scheduler": ExponentialDecaySchedulerConfig(lr_final=1e-4, max_steps=5000),
+        },
+    },
+    viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
+    vis="viewer",
+)
+
+method_configs["nerfacto_edge"] = TrainerConfig(
+    method_name="nerfacto_edge",
+    steps_per_eval_batch=500,
+    steps_per_save=2000,
+    max_num_iterations=30000,
+    mixed_precision=True,
+    pipeline=VanillaPipelineConfig(
+        datamanager=ParallelEdgeDataManagerConfig(
+            dataparser=NerfstudioDataParserConfig(),
+            train_num_rays_per_batch=4096,
+            eval_num_rays_per_batch=4096,
+        ),
+        model=NerfactoEdgeModelConfig(
+            eval_num_rays_per_chunk=1 << 15,
+            average_init_density=0.01,
+            camera_optimizer=CameraOptimizerConfig(mode="SO3xR3"),
+            edge_loss_weight=0.1,
         ),
     ),
     optimizers={

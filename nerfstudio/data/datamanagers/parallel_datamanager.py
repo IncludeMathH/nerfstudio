@@ -222,7 +222,7 @@ class ParallelDataManager(DataManager, Generic[TDataset]):
             return PatchPixelSamplerConfig().setup(
                 patch_size=self.config.patch_size, num_rays_per_batch=num_rays_per_batch
             )
-        is_equirectangular = (dataset.cameras.camera_type == CameraType.EQUIRECTANGULAR.value).all()
+        is_equirectangular = (dataset.cameras.camera_type == CameraType.EQUIRECTANGULAR.value).all()   # False
         if is_equirectangular.any():
             CONSOLE.print("[bold yellow]Warning: Some cameras are equirectangular, but using default pixel sampler.")
 

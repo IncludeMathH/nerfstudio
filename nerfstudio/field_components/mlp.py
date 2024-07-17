@@ -112,34 +112,6 @@ class MLP(FieldComponent):
                 network_config=network_config,
             )
 
-    #     # sequential module
-    #     sequential_configs = {
-    #         'type': 'LSTM',
-    #         'lstm_n_layers': 2,
-    #         'lstm_dropout': 0.1,
-    #     }
-    #     sequential_type = sequential_configs['type']
-
-    #     if sequential_type == 'LSTM':
-    #         lstm_n_layers = sequential_configs['lstm_n_layers']
-    #         lstm_dropout = sequential_configs['lstm_dropout']
-            
-    #     self.lstm_r = nn.LSTM(input_size=layer_width,
-    #                         hidden_size=layer_width * 4,
-    #                         num_layers=lstm_n_layers,
-    #                         dropout=lstm_dropout,
-    #                         bidirectional=True,
-    #                         batch_first=True)
-    #     print(f'using lstm in MLP')
-        
-    #     self._init_weights()
-
-    # def _init_weights(self):
-    #     nn.init.xavier_normal_(self.lstm_r.all_weights[0][0])
-    #     nn.init.xavier_normal_(self.lstm_r.all_weights[0][1])
-    #     nn.init.xavier_normal_(self.lstm_r.all_weights[1][0])
-    #     nn.init.xavier_normal_(self.lstm_r.all_weights[1][1])
-
     @classmethod
     def get_tcnn_network_config(cls, activation, out_activation, layer_width, num_layers) -> dict:
         """Get the network configuration for tcnn if implemented"""
@@ -169,23 +141,6 @@ class MLP(FieldComponent):
 
     def build_nn_modules(self) -> None:
         """Initialize the torch version of the multi-layer perceptron."""
-                
-        # sequential module
-        # sequential_configs = {
-        #     'type': 'LSTM',
-        #     'lstm_n_layers': 2,
-        #     'lstm_dropout': 0.1,
-        # }
-
-        sequential_configs = {
-            'type': 'RNN',
-            'expand': 0.5,
-            'num_layers': 2, 
-            'dropout': 0.1,
-        }
-
-        sequential_type = sequential_configs['type']         
-            
         layers = []
         if self.num_layers == 1:
             layers.append(nn.Linear(self.in_dim, self.out_dim))
@@ -197,26 +152,7 @@ class MLP(FieldComponent):
                 elif i in self._skip_connections:
                     layers.append(nn.Linear(self.layer_width + self.in_dim, self.layer_width))
                 else:
-                    if sequential_type == 'LSTM':
-                        layers.append(nn.Sequential(
-                                    nn.Linear(self.layer_width, self.layer_width),
-                                    nn.LSTM(input_size=self.layer_width,
-                                            hidden_size=self.layer_width * 4,  #  // 2,
-                                            num_layers=sequential_configs['lstm_n_layers'],
-                                            dropout=sequential_configs['lstm_dropout'],
-                                            bidirectional=True,
-                                            batch_first=True))
-                        )
-                    elif sequential_type == 'RNN':
-                        print(f'using RNN in MLP at layer {i}')
-                        layers.append(nn.Sequential(
-                            nn.Linear(self.layer_width, self.layer_width),
-                            nn.RNN(input_size=self.layer_width,
-                                   hidden_size=int(self.layer_width * sequential_configs['expand']),
-                                   num_layers=sequential_configs['num_layers'],
-                                   dropout=sequential_configs['dropout'],
-                                   bidirectional=True,)
-                        ))
+                    layers.append(nn.Linear(self.layer_width, self.layer_width))
             layers.append(nn.Linear(self.layer_width, self.out_dim))
         self.layers = nn.ModuleList(layers)
 
@@ -234,12 +170,7 @@ class MLP(FieldComponent):
             # as checked in `build_nn_modules`, 0 should not be in `_skip_connections`
             if i in self._skip_connections:
                 x = torch.cat([in_tensor, x], -1)
-
             x = layer(x)
-            
-            if isinstance(x, tuple):
-                x = x[0]
-                
             if self.activation is not None and i < len(self.layers) - 1:
                 x = self.activation(x)
         if self.out_activation is not None:
