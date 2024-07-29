@@ -10,7 +10,7 @@ helpFunction_launch_train()
    exit 1 # Exit program after printing help
 }
 
-vis="wandb"
+vis="tensorboard"
 single=false
 while getopts "m:v:s" opt; do
     case "$opt" in
@@ -54,7 +54,18 @@ if [ -z "${GPU_IDX[0]+x}" ]; then
 fi
 echo "available gpus... ${GPU_IDX[*]}"
 
-DATASETS=("mic" "ficus" "chair" "hotdog" "materials" "drums" "ship" "lego")
+DATASETS=()
+for folder in data/omniobject3d_ocr/boxed_beverage; do
+    if [ -d "$folder" ]; then
+        for subfolder in "$folder"/*; do
+            if [ -d "$subfolder" ]; then
+                # Perform operations on each subfolder
+                echo "Processing subfolder: $subfolder"
+                DATASETS+=("$subfolder")
+            fi
+        done
+    fi
+done
 date
 tag=$(date +'%Y-%m-%d')
 idx=0
@@ -79,7 +90,7 @@ for dataset in "${DATASETS[@]}"; do
     fi
     export CUDA_VISIBLE_DEVICES="${GPU_IDX[$idx]}"
     ns-train "${method_name}" "${method_opts[@]}" \
-             --data="data/blender/${dataset}${trans_file}" \
+             --data="${dataset}${trans_file}/render" \
              --experiment-name="blender_${dataset}_${tag}" \
              --relative-model-dir=nerfstudio_models/ \
              --steps-per-save=1000 \

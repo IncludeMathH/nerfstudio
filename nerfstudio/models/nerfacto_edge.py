@@ -119,7 +119,7 @@ class NerfactoEdgeModel(NerfactoModel):
         loss_dict = super().get_loss_dict(outputs, batch, metrics_dict)
         pred_edge = outputs['edge']
         gt_edge = batch['edge'].to(self.device)
-        loss_dict['edge_loss'] = self.compute_edge_loss(gt_edge, pred_edge)
+        loss_dict['edge_loss'] = self.compute_edge_loss(gt_edge.unsqueeze(-1), pred_edge)
         return loss_dict
 
     def compute_edge_loss(self, gt_edge, pred_edge):

@@ -527,3 +527,88 @@ class PairPixelSampler(PixelSampler):  # pylint: disable=too-few-public-methods
         pair_indices += indices
         indices = torch.hstack((indices, pair_indices)).view(rays_to_sample * 2, 3)
         return indices
+
+@dataclass
+class ContentWeightedPixelSamplerConfig(PixelSamplerConfig):
+    """Config dataclass for ContentWeightedPixelSampler."""
+
+    _target: Type = field(default_factory=lambda: ContentWeightedPixelSampler)
+    """Target class to instantiate."""
+    keypoint_weight: float = 1.0
+    """Weight for sampling keypoints."""
+    edge_weight: float = 1.0
+    """Weight for sampling edges."""
+    face_weight: float = 1.0
+    """Weight for sampling faces."""
+
+
+class ContentWeightedPixelSampler(PixelSampler):
+    """Samples pixels from 'image_batch's based on the content of the image.
+    The sampling weights can be adjusted for keypoints, edges, and faces.
+
+    Args:
+        config: the ContentWeightedPixelSamplerConfig used to instantiate class
+    """
+    config: ContentWeightedPixelSamplerConfig
+
+    def __init__(self, config: ContentWeightedPixelSamplerConfig, **kwargs) -> None:
+        super().__init__(config, **kwargs)
+        self.keypoint_weight = self.config.keypoint_weight
+        self.edge_weight = self.config.edge_weight
+        self.face_weight = self.config.face_weight
+
+    # overrides base method
+    def sample_method(
+        self,
+        batch_size: Optional[int],
+        num_images: int,
+        image_height: int,
+        image_width: int,
+        mask: Optional[Tensor] = None,
+        device: Union[torch.device, str] = "cpu",
+    ) -> Int[Tensor, "batch_size 3"]:
+        if batch_size is None:
+            raise ValueError("batch_size must be provided")
+
+        keypoints = self.sample_keypoints(batch_size, num_images, image_height, image_width, mask, device)
+        edges = self.sample_edges(batch_size, num_images, image_height, image_width, mask, device)
+        faces = self.sample_faces(batch_size, num_images, image_height, image_width, mask, device)
+
+        indices = torch.cat((keypoints, edges, faces), dim=0)
+        return indices
+
+    def sample_keypoints(
+        self,
+        batch_size: int,
+        num_images: int,
+        image_height: int,
+        image_width: int,
+        mask: Optional[Tensor] = None,
+        device: Union[torch.device, str] = "cpu",
+    ) -> Int[Tensor, "batch_size 3"]:
+        keypoints = torch.randint(0, num_images, (batch_size, 1), dtype=torch.long, device=device)
+        return keypoints
+
+    def sample_edges(
+        self,
+        batch_size: int,
+        num_images: int,
+        image_height: int,
+        image_width: int,
+        mask: Optional[Tensor] = None,
+        device: Union[torch.device, str] = "cpu",
+    ) -> Int[Tensor, "batch_size 3"]:
+        edges = torch.randint(0, num_images, (batch_size, 1), dtype=torch.long, device=device)
+        return edges
+
+    def sample_faces(
+        self,
+        batch_size: int,
+        num_images: int,
+        image_height: int,
+        image_width: int,
+        mask: Optional[Tensor] = None,
+        device: Union[torch.device, str] = "cpu",
+    ) -> Int[Tensor, "batch_size 3"]:
+        faces = torch.randint(0, num_images, (batch_size, 1), dtype=torch.long, device=device)
+        return faces
