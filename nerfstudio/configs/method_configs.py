@@ -29,7 +29,7 @@ from nerfstudio.configs.base_config import ViewerConfig
 from nerfstudio.configs.external_methods import ExternalMethodDummyTrainerConfig, get_external_methods
 from nerfstudio.data.datamanagers.base_datamanager import VanillaDataManager, VanillaDataManagerConfig
 from nerfstudio.data.datamanagers.full_images_datamanager import FullImageDatamanagerConfig
-from nerfstudio.data.datamanagers.parallel_datamanager import ParallelDataManagerConfig
+from nerfstudio.data.datamanagers.parallel_datamanager import ParallelDataManagerConfig, ParallelDataManager
 from nerfstudio.data.datamanagers.parallel_edge_datamanager import ParallelEdgeDataManagerConfig
 from nerfstudio.data.datamanagers.random_cameras_datamanager import RandomCamerasDataManagerConfig
 from nerfstudio.data.dataparsers.blender_dataparser import BlenderDataParserConfig
@@ -42,7 +42,9 @@ from nerfstudio.data.dataparsers.sitcoms3d_dataparser import Sitcoms3DDataParser
 from nerfstudio.data.datasets.depth_dataset import DepthDataset
 from nerfstudio.data.datasets.sdf_dataset import SDFDataset
 from nerfstudio.data.datasets.semantic_dataset import SemanticDataset
-from nerfstudio.data.pixel_samplers import PairPixelSamplerConfig
+
+from nerfstudio.data.datasets.resample_dataset import ResampleDataset
+from nerfstudio.data.pixel_samplers import PairPixelSamplerConfig, ContentWeightedPixelSamplerConfig
 from nerfstudio.engine.optimizers import AdamOptimizerConfig, RAdamOptimizerConfig
 from nerfstudio.engine.schedulers import (
     CosineDecaySchedulerConfig,
@@ -119,6 +121,44 @@ method_configs["nerfacto"] = TrainerConfig(
     },
     viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
     vis="viewer",
+)
+
+method_configs["nerfacto_resample"] = TrainerConfig(
+    method_name="nerfacto",
+    steps_per_eval_batch=500,
+    steps_per_save=2000,
+    max_num_iterations=30000,
+    mixed_precision=True,
+    pipeline=VanillaPipelineConfig(
+        datamanager=ParallelDataManagerConfig(
+            _target=ParallelDataManager[ResampleDataset],
+            dataparser=NerfstudioDataParserConfig(),
+            train_num_rays_per_batch=4096,
+            eval_num_rays_per_batch=4096,
+            pixel_sampler=ContentWeightedPixelSamplerConfig(),
+        ),
+        model=NerfactoModelConfig(
+            eval_num_rays_per_chunk=1 << 15,
+            average_init_density=0.01,
+            camera_optimizer=CameraOptimizerConfig(mode="SO3xR3"),
+        ),
+    ),
+    optimizers={
+        "proposal_networks": {
+            "optimizer": AdamOptimizerConfig(lr=1e-3, eps=1e-15),
+            "scheduler": ExponentialDecaySchedulerConfig(lr_final=0.0001, max_steps=200000),
+        },
+        "fields": {
+            "optimizer": AdamOptimizerConfig(lr=1e-3, eps=1e-15),
+            "scheduler": ExponentialDecaySchedulerConfig(lr_final=0.0001, max_steps=200000),
+        },
+        "camera_opt": {
+            "optimizer": AdamOptimizerConfig(lr=1e-4, eps=1e-15),
+            "scheduler": ExponentialDecaySchedulerConfig(lr_final=1e-4, max_steps=5000),
+        },
+    },
+    viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
+    vis="tensorboard",
 )
 
 method_configs["nerfacto_edge"] = TrainerConfig(
@@ -344,6 +384,30 @@ method_configs["mipnerf"] = TrainerConfig(
     method_name="mipnerf",
     pipeline=VanillaPipelineConfig(
         datamanager=ParallelDataManagerConfig(dataparser=NerfstudioDataParserConfig(), train_num_rays_per_batch=1024),
+        model=VanillaModelConfig(
+            _target=MipNerfModel,
+            loss_coefficients={"rgb_loss_coarse": 0.1, "rgb_loss_fine": 1.0},
+            num_coarse_samples=128,
+            num_importance_samples=128,
+            eval_num_rays_per_chunk=1024,
+        ),
+    ),
+    optimizers={
+        "fields": {
+            "optimizer": RAdamOptimizerConfig(lr=5e-4, eps=1e-08),
+            "scheduler": None,
+        }
+    },
+)
+
+method_configs["mipnerf_resample"] = TrainerConfig(
+    method_name="mipnerf",
+    pipeline=VanillaPipelineConfig(
+        datamanager=ParallelDataManagerConfig(
+            _target=ParallelDataManager[ResampleDataset],
+            pixel_sampler=ContentWeightedPixelSamplerConfig(),
+            dataparser=NerfstudioDataParserConfig(), 
+            train_num_rays_per_batch=1024),
         model=VanillaModelConfig(
             _target=MipNerfModel,
             loss_coefficients={"rgb_loss_coarse": 0.1, "rgb_loss_fine": 1.0},

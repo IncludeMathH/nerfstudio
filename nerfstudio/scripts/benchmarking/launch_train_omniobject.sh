@@ -12,17 +12,22 @@ helpFunction_launch_train()
 
 vis="tensorboard"
 single=false
-while getopts "m:v:s" opt; do
+while getopts "m:v:s:d:" opt; do
     case "$opt" in
         m ) method_name="$OPTARG" ;;
         v ) vis="$OPTARG" ;;
         s ) single=true ;;
+        d ) dataset_name="$OPTARG" ;;
         ? ) helpFunction ;;
     esac
 done
 
 if [ -z "${method_name+x}" ]; then
     echo "Missing method name"
+    helpFunction_launch_train
+fi
+if [ -z "${dataset_name+x}" ]; then
+    echo "Missing dataset name"
     helpFunction_launch_train
 fi
 method_opts=()
@@ -55,7 +60,7 @@ fi
 echo "available gpus... ${GPU_IDX[*]}"
 
 DATASETS=()
-for folder in data/omniobject3d_ocr/boxed_beverage; do
+for folder in data/omniobject3d_ocr/${dataset_name}; do
     if [ -d "$folder" ]; then
         for subfolder in "$folder"/*; do
             if [ -d "$subfolder" ]; then

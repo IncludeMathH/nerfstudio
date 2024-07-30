@@ -2,15 +2,11 @@ from nerfstudio.data.datasets.edge_dataset import EdgeDataset
 from nerfstudio.data.datasets.base_dataset import InputDataset
 from nerfstudio.data.datamanagers.parallel_datamanager import ParallelDataManager, ParallelDataManagerConfig
 from dataclasses import dataclass, field
-from nerfstudio.data.datamanagers.base_datamanager import (
-    TDataset,
-    VanillaDataManagerConfig,
-)
+from nerfstudio.data.datamanagers.base_datamanager import TDataset
+
 from typing import Type, cast, get_origin, get_args, ForwardRef
 from functools import cached_property
 from nerfstudio.utils.misc import get_orig_class
-
-# EDataset = TypeVar("EDataset", bound=InputDataset, default=EdgeDataset)
 
 @dataclass
 class ParallelEdgeDataManagerConfig(ParallelDataManagerConfig):
