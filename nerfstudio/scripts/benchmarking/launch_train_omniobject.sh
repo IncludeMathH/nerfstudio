@@ -94,9 +94,11 @@ for dataset in "${DATASETS[@]}"; do
         echo "GPU ${GPU_IDX[$idx]} is available"
     fi
     export CUDA_VISIBLE_DEVICES="${GPU_IDX[$idx]}"
+    data_name=$(basename "$dataset")
     ns-train "${method_name}" "${method_opts[@]}" \
              --data="${dataset}${trans_file}/render" \
-             --experiment-name="blender_${dataset}_${tag}" \
+             --method-name="${method_name}" \
+             --experiment-name="omniobject3d_ocr/${dataset_name}/${data_name}" \
              --relative-model-dir=nerfstudio_models/ \
              --steps-per-save=1000 \
              --max-num-iterations=16500 \

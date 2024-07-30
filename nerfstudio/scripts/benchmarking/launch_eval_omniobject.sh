@@ -12,12 +12,13 @@ helpFunction_launch_eval()
 }
 
 single=false
-while getopts "m:o:t:s" opt; do
+while getopts "m:o:t:s:d:" opt; do
     case "$opt" in
         m ) method_name="$OPTARG" ;;
         o ) output_dir="$OPTARG" ;;
         t ) timestamp="$OPTARG" ;;
         s ) single=true ;;
+        d ) dataset_name="$OPTARG" ;;
         ? ) helpFunction_launch_eval ;; 
     esac
 done
@@ -35,6 +36,11 @@ fi
 if [ -z "$timestamp" ]; then
     echo "Missing timestamp specification"
     helpFunction_launch_eval
+fi
+
+if [ -z "${dataset_name+x}" ]; then
+    echo "Missing dataset name"
+    helpFunction_launch_train
 fi
 
 shift $((OPTIND-1))
@@ -59,13 +65,14 @@ fi
 echo "available gpus... ${GPU_IDX[*]}"
 
 DATASETS=()
-for folder in data/omniobject3d_ocr/*; do
+for folder in data/omniobject3d_ocr/${dataset_name}; do
     if [ -d "$folder" ]; then
         for subfolder in "$folder"/*; do
             if [ -d "$subfolder" ]; then
                 # Perform operations on each subfolder
-                echo "Processing subfolder: $subfolder"
-                DATASETS+=("$subfolder")
+                data_name=$(basename "$subfolder")
+                echo "Processing subfolder: $data_name"
+                DATASETS+=("$data_name")
             fi
         done
     fi
@@ -81,9 +88,9 @@ for dataset in "${DATASETS[@]}"; do
         wait "${GPU_PID[$idx]}"
     fi
     export CUDA_VISIBLE_DEVICES=${GPU_IDX[$idx]}
-    config_path="${output_dir}/blender_${dataset}_${timestamp::-7}/${method_name}/${timestamp}/config.yml"
+    config_path="${output_dir}/${dataset_name}/${dataset}/${method_name}/${timestamp}/config.yml"
     ns-eval --load-config="${config_path}" \
-            --output-path="${output_dir}/${method_name}/blender_${dataset}_${timestamp}.json" & GPU_PID[$idx]=$!
+            --output-path="${output_dir}/${method_name}/${dataset}_${timestamp}.json" & GPU_PID[$idx]=$!
     echo "Launched ${config_path} on gpu ${GPU_IDX[$idx]}"
 
     # update gpu
