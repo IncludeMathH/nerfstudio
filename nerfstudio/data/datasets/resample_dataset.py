@@ -5,6 +5,7 @@ from collections import defaultdict
 import torch, ast
 from torch import Tensor
 import os.path as osp
+from jaxtyping import Float, UInt8
 
 class ResampleDataset(InputDataset):
     def __init__(self, dataparser_outputs: DataparserOutputs, scale_factor: float = 1.0):
@@ -42,6 +43,43 @@ class ResampleDataset(InputDataset):
         
         rois[:len(real_rois)] = torch.tensor(real_rois, dtype=torch.float32)
         return rois
+    
+    def get_image_float32(self, image_idx: int) -> Float[Tensor, "image_height image_width num_channels"]:
+        """Returns a 3 channel image in float32 torch.Tensor.
+
+        Args:
+            image_idx: The image index in the dataset.
+        """
+        image = torch.from_numpy(self.get_numpy_image(image_idx).astype("float32") / 255.0)
+        if self._dataparser_outputs.alpha_color is not None and image.shape[-1] == 4:
+            assert (self._dataparser_outputs.alpha_color >= 0).all() and (
+                self._dataparser_outputs.alpha_color <= 1
+            ).all(), "alpha color given is out of range between [0, 1]."
+            image = image[:, :, :3] * image[:, :, -1:] + self._dataparser_outputs.alpha_color * (1.0 - image[:, :, -1:])
+        elif image.shape[-1] == 3:
+            image = torch.where(image == torch.tensor([0., 0., 0.]), torch.tensor([1.0, 1.0, 1.0]), image)
+        return image
+
+    def get_image_uint8(self, image_idx: int) -> UInt8[Tensor, "image_height image_width num_channels"]:
+        """Returns a 3 channel image in uint8 torch.Tensor.
+
+        Args:
+            image_idx: The image index in the dataset.
+        """
+        image = torch.from_numpy(self.get_numpy_image(image_idx))
+        if self._dataparser_outputs.alpha_color is not None and image.shape[-1] == 4:
+            assert (self._dataparser_outputs.alpha_color >= 0).all() and (
+                self._dataparser_outputs.alpha_color <= 1
+            ).all(), "alpha color given is out of range between [0, 1]."
+            image = image[:, :, :3] * (image[:, :, -1:] / 255.0) + 255.0 * self._dataparser_outputs.alpha_color * (
+                1.0 - image[:, :, -1:] / 255.0
+            )
+            image = torch.clamp(image, min=0, max=255).to(torch.uint8)
+        elif image.shape[-1] == 3:
+            image = torch.where(image == torch.tensor([0., 0., 0.]), torch.tensor([1.0, 1.0, 1.0]), image)
+            image = torch.clamp(image, min=0, max=255).to(torch.uint8)
+        return image
+
     
     def get_metadata(self, data: Dict) -> Dict:
         """Method that can be used to process any additional metadata that may be part of the model inputs.

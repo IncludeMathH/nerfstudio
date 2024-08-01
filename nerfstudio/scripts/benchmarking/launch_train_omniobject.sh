@@ -12,12 +12,12 @@ helpFunction_launch_train()
 
 vis="tensorboard"
 single=false
-while getopts "m:v:s:d:" opt; do
+while getopts "m:v:d:s" opt; do
     case "$opt" in
         m ) method_name="$OPTARG" ;;
         v ) vis="$OPTARG" ;;
-        s ) single=true ;;
         d ) dataset_name="$OPTARG" ;;
+        s ) single=true ;;
         ? ) helpFunction ;;
     esac
 done
@@ -36,6 +36,9 @@ if [ "$method_name" = "nerfacto" ]; then
     method_opts=(--pipeline.model.background-color white --pipeline.model.proposal-initial-sampler uniform --pipeline.model.near-plane 2. --pipeline.model.far-plane 6. --pipeline.model.camera-optimizer.mode off --pipeline.model.use-average-appearance-embedding False --pipeline.model.distortion-loss-mult 0 --pipeline.model.disable-scene-contraction True)
 elif [ "$method_name" = "nerfacto_edge" ]; then
     method_opts=(--pipeline.model.background-color white --pipeline.model.proposal-initial-sampler uniform --pipeline.model.near-plane 2. --pipeline.model.far-plane 6. --pipeline.model.camera-optimizer.mode off --pipeline.model.use-average-appearance-embedding False --pipeline.model.distortion-loss-mult 0 --pipeline.model.disable-scene-contraction True --pipeline.model.edge-loss-weight 1.0)
+# elif [ "$method_name" = 'mipnerf_resample' ]; then
+#     method_opts=(--optimizers.fields.optimizer.lr 5e-5)
+#     echo "Using lr 5e-5 in mipnerf_resample"
 fi
 
 shift $((OPTIND-1))

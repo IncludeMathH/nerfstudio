@@ -12,13 +12,13 @@ helpFunction_launch_eval()
 }
 
 single=false
-while getopts "m:o:t:s:d:" opt; do
+while getopts "m:o:t:d:s" opt; do
     case "$opt" in
         m ) method_name="$OPTARG" ;;
         o ) output_dir="$OPTARG" ;;
         t ) timestamp="$OPTARG" ;;
-        s ) single=true ;;
         d ) dataset_name="$OPTARG" ;;
+        s ) single=true ;;
         ? ) helpFunction_launch_eval ;; 
     esac
 done
